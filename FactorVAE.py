@@ -215,25 +215,35 @@ class factorTrain(UnsupervisedTrainer):
         return torch.cat(perm_z, 1)
 
     def loss(self, tensors):
+        gamma = 6.4
 
         sample_batch, local_l_mean, local_l_var, batch_index, y = tensors
         reconst_loss, kl_divergence_local, kl_divergence_global = self.model(
             sample_batch, local_l_mean, local_l_var, batch_index, y
         )
+        z = self.model.get_latents(sample_batch, y)[0]
+        z_prime = z.clone()
+
+        D_z = self.D(z)
+        vae_tc_loss = (D_z[:, :1] - D_z[:, 1:]).mean()
+
         loss = (
                 self.n_samples
                 * torch.mean(reconst_loss + self.kl_weight * kl_divergence_local)
                 + kl_divergence_global
+                + gamma * vae_tc_loss
         )
 
+
         # print("n_batch is {}".format(sample_batch.shape))
-        z_prime = self.model.get_latents(sample_batch, y)[0]
+        # z_prime = self.model.get_latents(sample_batch, y)[0]
         # print("zPrime shape is {}".format(z_prime.shape))
 
         # qz_m = outputs["qz_m"]
         # qz_v = outputs["qz_v"]
         #
         # z_prime = self.reparametrize(qz_m, qz_v)
+
         z_pperm = self.permute_dims(z_prime).detach()
         D_z_pperm = self.D(z_pperm)
         D_z = self.D(z_prime)
@@ -252,7 +262,7 @@ class factorTrain(UnsupervisedTrainer):
         loss, D_loss = self.loss(*tensors_list)
         self.current_loss, self.D_loss = loss, D_loss
         self.optimizer.zero_grad()
-        loss.backward()
+        loss.backward(retain_graph=True)
         self.optimizer.step()
 
         self.optim_D.zero_grad()
