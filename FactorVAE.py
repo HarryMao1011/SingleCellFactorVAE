@@ -255,7 +255,7 @@ class factorTrain(UnsupervisedTrainer):
         if self.normalize_loss:
             loss = loss / self.n_samples
             D_tc_loss = D_tc_loss / self.n_samples
-
+        print("VAE loss {}, Discriminator loss {}".format(loss, D_tc_loss))
         return loss, D_tc_loss
 
     def on_training_loop(self, tensors_list):
